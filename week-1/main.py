@@ -1,8 +1,11 @@
 from http.client import HTTPException
-
+from pydantic import BaseModel
 from fastapi import FastAPI
 import uuid
 
+class TaskCreate(BaseModel):
+    title:str
+    done:bool=False
 
 app = FastAPI()
 
@@ -47,4 +50,17 @@ async def root(id:uuid.UUID):
         if task["id"] == id:
             return task
         raise HTTPException(status_code=404,details=f"Task{id} not Found") 
-        
+
+
+@app.post('/tasks')
+async def create_task(task:TaskCreate):
+    new_task = {
+        "id" : uuid.uuid4(),
+        "title" : task.title,
+        "done" : False,
+    }
+
+    tasks.append(new_task)
+
+    return new_task
+
