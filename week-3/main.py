@@ -1,9 +1,10 @@
-﻿import sqlite3
+import sqlite3
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
@@ -27,6 +28,10 @@ def initialize_database() -> None:
                 "INSERT INTO tasks (title, done) VALUES (?, ?)",
                 [("get request", 1), ("POST:id request", 1), ("POST request", 0)],
             )
+
+
+def task_from_row(row: sqlite3.Row) -> dict:
+    return {"id": row[0], "title": row[1], "done": bool(row[2])}
 
 
 initialize_database()
@@ -64,15 +69,18 @@ async def health():
 
 @app.get("/tasks")
 async def list_tasks():
-    return tasks
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        rows = connection.execute("SELECT * FROM tasks").fetchall()
+    return [task_from_row(row) for row in rows]
 
 
 @app.get("/tasks/{id}")
 async def get_task(id: int):
-    for task in tasks:
-        if task["id"] == id:
-            return task
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        row = connection.execute("SELECT * FROM tasks WHERE id = ?", (id,)).fetchone()
+    if row is None:
+        return JSONResponse(status_code=404, content={"error": "Task not found"})
+    return task_from_row(row)
 
 
 @app.post("/tasks")
