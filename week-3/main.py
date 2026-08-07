@@ -107,18 +107,24 @@ async def create_task(task: TaskCreate, res: Response):
 async def update_task(task: TaskUpdate, id: int):
     if not task.title or task.title.strip() == "":
         raise HTTPException(status_code=400, detail="Title required")
-    for stored_task in tasks:
-        if stored_task["id"] == id:
-            stored_task["title"] = task.title
-            stored_task["done"] = task.done
-            return {"message": f"Task{id} updated", "status_code": 200, "data": stored_task}
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        cursor = connection.execute(
+            "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+            (task.title, int(task.done), id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Task {id} not found")
+        row = connection.execute("SELECT * FROM tasks WHERE id = ?", (id,)).fetchone()
+
+    updated_task = task_from_row(row)
+    return {"message": f"Task{id} updated", "status_code": 200, "data": updated_task}
 
 
 @app.delete("/tasks/{id}")
 async def delete_task(id: int):
-    for task in tasks:
-        if task["id"] == id:
-            tasks.remove(task)
-            return Response(status_code=204)
-    raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        cursor = connection.execute("DELETE FROM tasks WHERE id = ?", (id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Task {id} not found")
+    return Response(status_code=204)
