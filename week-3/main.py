@@ -87,8 +87,18 @@ async def get_task(id: int):
 async def create_task(task: TaskCreate, res: Response):
     if not task.title or task.title.strip() == "":
         raise HTTPException(status_code=400, detail="Title required")
-    new_task = {"id": len(tasks) + 1, "title": task.title, "done": False}
-    tasks.append(new_task)
+
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        cursor = connection.execute(
+            "INSERT INTO tasks (title, done) VALUES (?, ?)",
+            (task.title, 0),
+        )
+        new_task = {
+            "id": cursor.lastrowid,
+            "title": task.title,
+            "done": False,
+        }
+
     res.status_code = 201
     return {"message": "done, here's your receipt", "data": new_task, "status_code": 201}
 
