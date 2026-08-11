@@ -1,11 +1,18 @@
+﻿from logging import getLoggerClass
+import psycopg2
 import sqlite3
 from pathlib import Path
-
+import psycopg2
+import os
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+DATABASE_URL = os.environ["DATABASE_URL"]
+
+
 
 
 DATABASE_PATH = Path(__file__).with_name("tasks.db")
@@ -55,6 +62,36 @@ tasks = [
     {"id": 2, "title": "POST:id request", "done": True},
     {"id": 3, "title": "POST request", "done": False},
 ]
+
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
+
+def task_from_row(row) -> dict:
+    return {"id": row[0], "title":row[1], "done":row[2]}
+
+def init_DB() -> None:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    done BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+
+            cursor.execute("SELECT COUNT(*) FROM tasks")
+            task_count = cursor.fetchone()[0]
+            if task_count == 0:
+                cursor.executemany(
+                    "INSERT INTO tasks (title, done) VALUES (%s, %s)",
+                    [
+                        ("get request", True),
+                        ("POST:id request", True),
+                        ("POST request", False),
+                    ],
+                )
+    connection.commit()
 
 
 @app.get("/")
