@@ -19,3 +19,8 @@ dist/
 # Local SQLite database
 week-3/tasks.db
 week-4/.env
+
+.env
+**/.env
+.env.*
+!.env.example
