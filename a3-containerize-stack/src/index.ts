@@ -2,20 +2,26 @@ import express from "express"
 import dotenv from "dotenv"
 import { getTaskById,
     createTask,deleteTask
-    ,updateTask,getTasks, 
-    } from "./repository/taskRepository.js";
-import e from "express";
+    ,updateTask,getTasks,
+    initializeDatabase, 
+  } from "./repository/taskRepository.js";
+import morgan from "morgan"
+
 
 dotenv.config()
 
 const app = express()
+app.use(morgan('dev'))
 
 app.use(express.json())
 
 app.get("/tasks", async (_req, res) => {
   try {
+    
     const tasks = await getTasks();
-
+    if(!tasks){
+      initializeDatabase()
+    }
     return res.status(200).json(tasks);
   } catch (error) {
     console.error(error);
@@ -126,8 +132,9 @@ app.get("/tasks/:id",async (_req, res) => {
    }
 })
 
-const PORT = process.env.DATABASE_URL
+const PORT = process.env.PORT
  app.listen(PORT,()=>{
+      
       console.log(`Server running on http://localhost:${PORT}`);
  })
 
