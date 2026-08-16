@@ -1,0 +1,156 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "FlyRank Auth API",
+    "description": "Secure API with Supabase Auth — sign up, log in, log out, JWT verification, protected routes, and Swagger UI.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter your Supabase JWT access token obtained from /auth/login."
+      }
+    }
+  },
+  "paths": {
+    "/auth/signup": {
+      "post": {
+        "summary": "Create a new user account",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "test@example.com" },
+                  "password": { "type": "string", "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User created successfully" },
+          "400": { "description": "Bad Request - Missing or invalid credentials" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Authenticate user & return JWT tokens",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "test@example.com" },
+                  "password": { "type": "string", "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful - returns access and refresh tokens" },
+          "400": { "description": "Bad Request - Missing credentials" },
+          "401": { "description": "Unauthorized - Invalid login credentials" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "End the user's session",
+        "tags": ["Auth"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Logged out successfully" },
+          "401": { "description": "Unauthorized - Access token required or invalid" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "summary": "Exchange a refresh token for a new access token",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refresh_token"],
+                "properties": {
+                  "refresh_token": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "New tokens issued" },
+          "400": { "description": "Bad Request - Missing refresh token" },
+          "401": { "description": "Unauthorized - Invalid or expired refresh token" }
+        }
+      }
+    },
+    "/public/info": {
+      "get": {
+        "summary": "Read public, open data",
+        "tags": ["Public"],
+        "responses": {
+          "200": { "description": "Returns public welcome message" }
+        }
+      }
+    },
+    "/protected/profile": {
+      "get": {
+        "summary": "Read private profile data",
+        "tags": ["Protected"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Returns verified user metadata" },
+          "401": { "description": "Unauthorized - Missing or invalid token" }
+        }
+      }
+    },
+    "/protected/dashboard": {
+      "get": {
+        "summary": "Access user dashboard",
+        "tags": ["Protected"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Returns dashboard data" },
+          "401": { "description": "Unauthorized - Missing or invalid token" }
+        }
+      }
+    },
+    "/protected/admin": {
+      "get": {
+        "summary": "Admin only endpoint (403 Forbidden demo)",
+        "tags": ["Protected"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Returns admin data" },
+          "401": { "description": "Unauthorized - Unauthenticated" },
+          "403": { "description": "Forbidden - Authenticated but not an admin" }
+        }
+      }
+    }
+  }
+}
