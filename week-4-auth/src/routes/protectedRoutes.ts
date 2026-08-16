@@ -1,5 +1,5 @@
 import express from 'express'
-import {authMiddleware} from '../middleware/authMiddleware.js'
+import {authMiddleware} from '../middleware/authMiddleware.ts'
 
 const router = express.Router()
 
@@ -7,7 +7,7 @@ const protectedRoute = router.post('/profile',authMiddleware,async (req, res)=>{
   res.status(200).json({message:"oken format received. Verification next."})
 })
 
-router.get('/profile',authMiddleware,(req, res)=>{
+router.get('/profile',authMiddleware,(req:any, res)=>{
   const user = req.user;
   res.status(200).json({
     id:user.id,
@@ -16,7 +16,7 @@ router.get('/profile',authMiddleware,(req, res)=>{
   })
 })
 
-router.get("/dashboard", authMiddleware, (req, res) => {
+router.get("/dashboard", authMiddleware, (req:any, res) => {
   res.status(200).json({
     message: "Welcome to your dashboard",
     user_id: req.user.id
