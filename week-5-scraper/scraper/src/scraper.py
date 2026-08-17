@@ -148,6 +148,15 @@ class Scraper:
             print(f"[{index}/{len(books)}] {url}")
             try:
                 raw = self.extract_book(url, source_page, self.detail_cache_path(index))
+                if index == 1:
+                    print("\n===== SAMPLE RAW RECORD =====")
+                    print(
+                    json.dumps(
+                    raw.model_dump(),
+                    indent=2,
+                    ensure_ascii=False,
+                     ))
+                     
                 book = self.normalize_and_validate(raw)
                 valid_books[book.product_url] = book
             except ValidationError as exc:
