@@ -10,7 +10,7 @@ def normalize_price(price_text:str)->float:
     match = re.search(r"(\d+(?:\.\d+)?)",price_text)
 
     if not match:
-        raise ValueError(f"Could not find price in {price_text!r}")
+        raise ValueError(f"Could not find price in {price_text}")
 
     return float(match.group(1))
 
@@ -24,4 +24,3 @@ def clean_text(value:str | None)-> str | None:
     return value if value else None
 
 
-    
