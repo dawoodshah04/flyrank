@@ -8,7 +8,7 @@ load_dotenv()
 
 client = OpenAI(
     base_url=os.environ["LLM_BASE_URL"],
-    api_key=os.environ["LLM_API_KEY"]
+    api_key=os.environ["LLM_API_KEY"],
 )
 
 response = client.chat.completions.create(
