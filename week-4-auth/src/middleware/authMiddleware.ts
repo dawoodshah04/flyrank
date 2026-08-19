@@ -8,31 +8,31 @@ export async function authMiddleware(
 ): Promise<void> {
   const authHeader = req.get('Authorization');
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({
-      error: 'Access token required'
-    });
-    return;
-  }
+if (!authHeader?.startsWith('Bearer ')) {
+  res.status(401).json({
+    error: 'Access token required',
+  });
+  return;
+}
 
-  const token = authHeader.substring(7).trim();
+const token = authHeader.slice('Bearer '.length).trim();
 
-  if (!token) {
-    res.status(401).json({
-      error: 'Access token required'
-    });
-    return;
-  }
+if (!token) {
+  res.status(401).json({
+    error: 'Access token required',
+  });
+  return;
+}
 
-  const { data, error } = await supabase.auth.getUser(token);
+const { data, error } = await supabase.auth.getUser(token);
 
-  if (error || !data.user) {
-    res.status(401).json({
-      error: 'Invalid or expired token'
-    });
-    return;
-  }
+if (error || !data.user) {
+  res.status(401).json({
+    error: 'Invalid or expired token',
+  });
+  return;
+}
 
-  req.user = data.user;
-  next();
+req.user = data.user;
+next();
 }
