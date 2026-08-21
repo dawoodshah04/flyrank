@@ -107,6 +107,52 @@ Every LLM call produces a structured JSON log line to stderr with:
 
 Use these logs to answer _"how much will this cost at 10,000 calls/day."_
 
+## Caching
+
+Successful `/triage` responses are cached in-process. The cache key is
+`sha256(PROMPT_VERSION + "\n" + user_text)`, so:
+
+- **Same input, same prompt version** → cache hit, no LLM call, no token spend.
+- **Same input, new prompt version** → cache miss (the version is part of the key). This is the intended invalidation mechanism: bump `PROMPT_VERSION` in `src/llm/service.py` when you change the system prompt.
+- **Different inputs** → cache miss.
+
+### Configuration
+
+| Variable | Default | Effect |
+|---|---|---|
+| `TRIAGE_CACHE_SIZE` | `256` | LRU cap. Entries beyond this evict the least-recently-used. |
+| `TRIAGE_CACHE_TTL_SECONDS` | `3600` | Entries expire after this many seconds. |
+
+Only **successful** results are cached. Outputs that fail validation twice and
+go to `logs/quarantine.jsonl` are never stored — the failure path skips `cache.put`.
+
+### Cache logging
+
+Every request emits one `cache_lookup` event, regardless of what happens next:
+
+```json
+{
+  "event": "cache_lookup",
+  "prompt_version": "triage-v1",
+  "key": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "result": "hit"
+}
+```
+
+`result` is `"hit"` or `"miss"`. A `hit` produces no `llm_call` event for that
+request.
+
+### Kill switch interaction
+
+The kill switch (`LLM_ENABLED=false`) is checked in the route handler **before**
+the cache is consulted. So a cache hit does **not** bypass the kill switch —
+operators get 503 even for inputs that would otherwise be served from cache.
+
+### Caveats
+
+- **Process-local.** The cache lives in the uvicorn worker's memory. Each worker has its own cache, and restarting the process empties it.
+- **Not thread-safe across concurrent mutation.** FastAPI's sync handlers run on a single worker thread by default, which is fine here. Wrap `get`/`put` in a lock if you move to multi-threaded handlers.
+
 ## Error Handling
 
 | Status | Meaning                                          |

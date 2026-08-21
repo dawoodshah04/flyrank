@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import random
 import time
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import openai
 from pydantic import ValidationError
 
+from src.llm.cache import TriageCache, make_key
 from src.llm.client import client, MODEL
 from src.llm.schema import TriageRes
 
@@ -19,11 +21,23 @@ QUARANTINE_PATH = Path("logs/quarantine.jsonl")
 MAX_RETRIES = 2  # 2 retries = 3 total attempts
 BASE_DELAYS = [1.0, 2.0, 4.0]
 
+# ── In-memory cache ──────────────────────────────────────────────
+# Caches successful triage results keyed by (prompt_version, user_text).
+# PROMPT_VERSION is part of the cache key, so bumping the version
+# (e.g. "triage-v1" -> "triage-v2") invalidates every entry automatically.
+# Cache size and TTL are tunable via env vars; defaults are deliberately
+# modest — repeated free-text support messages don't hit often, so a
+# big cache just burns memory.
+CACHE_SIZE = int(os.getenv("TRIAGE_CACHE_SIZE", "256"))
+CACHE_TTL_SECONDS = float(os.getenv("TRIAGE_CACHE_TTL_SECONDS", "3600"))
+_cache = TriageCache(max_size=CACHE_SIZE, ttl_seconds=CACHE_TTL_SECONDS)
+
 
 class LLMService:
     def __init__(self):
         self.client = client
         self.model = MODEL
+        self.cache = _cache  # process-wide cache (module-level singleton)
 
     def load_prompt(self) -> str:
         return PROMPT_PATH.read_text(encoding="utf-8")
@@ -222,6 +236,23 @@ class LLMService:
 
     def classify(self, user_text: str) -> TriageRes:
         """Classify a support message. Attempts repair once on invalid output."""
+        # ── Cache lookup ──────────────────────────────────────────
+        # Key includes the prompt version so a prompt bump invalidates
+        # all entries. Hit returns the stored TriageRes directly — no
+        # LLM call, no token spend, no log line beyond cache_lookup.
+        cache_key = make_key(PROMPT_VERSION, user_text)
+        cached = self.cache.get(cache_key)
+        logger.info(
+            json.dumps({
+                "event": "cache_lookup",
+                "prompt_version": PROMPT_VERSION,
+                "key": cache_key,
+                "result": "hit" if cached is not None else "miss",
+            })
+        )
+        if cached is not None:
+            return TriageRes.model_validate(cached)
+
         system_prompt = self.load_prompt()
 
         raw_output, usage, duration_ms = self.call_model(
@@ -231,6 +262,7 @@ class LLMService:
 
         try:
             result = self.validate_output(raw_output)
+            self.cache.put(cache_key, result.model_dump())
             self._log_call(usage, duration_ms, needed_repair=False, status="success")
             return result
 
@@ -245,6 +277,7 @@ class LLMService:
 
             try:
                 result = self.validate_output(repaired_output)
+                self.cache.put(cache_key, result.model_dump())
                 self._log_call(repair_usage, total_duration, needed_repair=True, status="success")
                 return result
 
