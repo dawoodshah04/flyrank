@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Image {
+  id         String   @id @default(uuid())
+  filename   String   @unique
+  filepath   String
+  status     String   @default("pending") // pending | tagged | low_confidence | failed
+  subject    String?
+  category   String?
+  attributes String[] @default([])
+  caption    String?
+  confidence Float?
+  embedding  Float[]  @default([])
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  suggestions Suggestion[]
+
+  @@index([status])
+  @@index([category])
+  @@map("images")
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  title     String
+  slug      String   @unique
+  content   String
+  tags      String[] @default([])
+  embedding Float[]  @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  suggestions Suggestion[]
+
+  @@index([slug])
+  @@map("posts")
+}
+
+model Suggestion {
+  id              String   @id @default(uuid())
+  postId          String   @map("post_id")
+  imageId         String   @map("image_id")
+  similarityScore Float    @map("similarity_score")
+  guardPassed     Boolean  @map("guard_passed")
+  guardReason     String?  @map("guard_reason")
+  rank            Int
+  status          String   @default("pending") // pending | approved | rejected
+  reviewNote      String?  @map("review_note")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  post  Post  @relation(fields: [postId], references: [id])
+  image Image @relation(fields: [imageId], references: [id])
+
+  @@unique([postId, imageId])
+  @@index([postId])
+  @@index([status])
+  @@map("suggestions")
+}
+
+model AiCallLog {
+  id        String   @id @default(uuid())
+  model     String // "gemini-2.0-flash", "text-embedding-004"
+  callType  String   @map("call_type") // "vision" | "embedding"
+  inputRef  String?  @map("input_ref") // image filename or post slug
+  tokensIn  Int?     @map("tokens_in")
+  tokensOut Int?     @map("tokens_out")
+  costUsd   Float    @default(0) @map("cost_usd")
+  success   Boolean
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([callType])
+  @@index([createdAt])
+  @@map("ai_call_log")
+}
