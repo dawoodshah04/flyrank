@@ -1,0 +1,33 @@
+# Capstone manifest — read by the evaluator
+name: AI Image Understanding & Content Matching Engine
+language: python, typescript
+
+run: |
+  docker compose up -d
+  cd server && npm install && npx prisma migrate dev && npm run dev
+
+seed: |
+  python corpus/download.py
+  pip install -r ai/requirements.txt
+  python -m ai.commands.seed_posts
+  python -m ai.jobs.ingest_images
+  python -m ai.jobs.embed_posts
+  python -m ai.commands.generate_suggestions
+
+test: |
+  python -m ai.commands.run_eval
+
+base_url: http://localhost:3000
+
+endpoints:
+  - GET /health
+  - GET /images
+  - GET /images/:id
+  - GET /posts
+  - GET /posts/:id
+  - POST /posts
+  - GET /posts/:id/images
+  - GET /suggestions
+  - GET /suggestions/:id
+  - POST /suggestions/:id/approve
+  - POST /suggestions/:id/reject
