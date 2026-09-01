@@ -1,12 +1,12 @@
 import { Router, Request, Response } from "express";
 import prisma from "../db";
-import { ReviewActionSchema, SuggestionQuerySchema } from "../schemas/suggestion";
+import { SuggestionQuerySchema, ReviewActionSchema } from "../schemas/suggestion";
 
 const router = Router();
 
 /**
  * GET /suggestions
- * List suggestions with optional filtering by status and postId.
+ * List suggestions with optional filtering by status or postId.
  */
 router.get("/", async (req: Request, res: Response) => {
   try {
@@ -19,7 +19,7 @@ router.get("/", async (req: Request, res: Response) => {
     const { status, postId, page, limit } = query.data;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, string> = {};
+    const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (postId) where.postId = postId;
 
@@ -28,6 +28,7 @@ router.get("/", async (req: Request, res: Response) => {
         where,
         skip,
         take: limit,
+        orderBy: { createdAt: "desc" },
         include: {
           image: {
             select: {
@@ -36,7 +37,6 @@ router.get("/", async (req: Request, res: Response) => {
               subject: true,
               category: true,
               caption: true,
-              confidence: true,
             },
           },
           post: {
@@ -47,7 +47,6 @@ router.get("/", async (req: Request, res: Response) => {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
       }),
       prisma.suggestion.count({ where }),
     ]);
@@ -64,32 +63,15 @@ router.get("/", async (req: Request, res: Response) => {
 
 /**
  * GET /suggestions/:id
- * Inspect a single suggestion — why was this image suggested or rejected?
+ * Get a single suggestion by ID.
  */
 router.get("/:id", async (req: Request, res: Response) => {
   try {
     const suggestion = await prisma.suggestion.findUnique({
       where: { id: req.params.id },
       include: {
-        image: {
-          select: {
-            id: true,
-            filename: true,
-            subject: true,
-            category: true,
-            attributes: true,
-            caption: true,
-            confidence: true,
-          },
-        },
-        post: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            tags: true,
-          },
-        },
+        image: true,
+        post: true,
       },
     });
 
@@ -98,20 +80,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({
-      data: {
-        ...suggestion,
-        explanation: {
-          similarityScore: suggestion.similarityScore,
-          guardPassed: suggestion.guardPassed,
-          guardReason: suggestion.guardReason,
-          imageSubject: suggestion.image.subject,
-          imageCategory: suggestion.image.category,
-          imageConfidence: suggestion.image.confidence,
-          postTags: suggestion.post.tags,
-        },
-      },
-    });
+    res.json({ data: suggestion });
   } catch (error) {
     console.error("Error fetching suggestion:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -120,7 +89,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 /**
  * POST /suggestions/:id/approve
- * Approve a suggested image-post pairing.
+ * Approve a suggestion.
  */
 router.post("/:id/approve", async (req: Request, res: Response) => {
   try {
@@ -130,14 +99,12 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
       return;
     }
 
-    const suggestion = await prisma.suggestion.findUnique({ where: { id: req.params.id } });
+    const suggestion = await prisma.suggestion.findUnique({
+      where: { id: req.params.id },
+    });
+
     if (!suggestion) {
       res.status(404).json({ error: "Suggestion not found" });
-      return;
-    }
-
-    if (suggestion.status !== "pending") {
-      res.status(409).json({ error: `Suggestion already ${suggestion.status}` });
       return;
     }
 
@@ -145,8 +112,9 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
       where: { id: req.params.id },
       data: {
         status: "approved",
-        reviewNote: parsed.data.reviewNote || null,
+        reviewNote: parsed.data.reviewNote,
       },
+      include: { image: true, post: true },
     });
 
     res.json({ data: updated });
@@ -158,7 +126,7 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
 
 /**
  * POST /suggestions/:id/reject
- * Reject a suggested image-post pairing with an optional note.
+ * Reject a suggestion.
  */
 router.post("/:id/reject", async (req: Request, res: Response) => {
   try {
@@ -168,14 +136,12 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
       return;
     }
 
-    const suggestion = await prisma.suggestion.findUnique({ where: { id: req.params.id } });
+    const suggestion = await prisma.suggestion.findUnique({
+      where: { id: req.params.id },
+    });
+
     if (!suggestion) {
       res.status(404).json({ error: "Suggestion not found" });
-      return;
-    }
-
-    if (suggestion.status !== "pending") {
-      res.status(409).json({ error: `Suggestion already ${suggestion.status}` });
       return;
     }
 
@@ -183,8 +149,9 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
       where: { id: req.params.id },
       data: {
         status: "rejected",
-        reviewNote: parsed.data.reviewNote || null,
+        reviewNote: parsed.data.reviewNote,
       },
+      include: { image: true, post: true },
     });
 
     res.json({ data: updated });

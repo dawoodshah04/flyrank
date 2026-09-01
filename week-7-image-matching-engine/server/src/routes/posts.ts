@@ -3,10 +3,11 @@ import prisma from "../db";
 import { CreatePostSchema, PostQuerySchema } from "../schemas/post";
 
 const router = Router();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * GET /posts
- * List all posts with pagination.
+ * List all posts with optional pagination.
  */
 router.get("/", async (req: Request, res: Response) => {
   try {
@@ -48,20 +49,15 @@ router.get("/", async (req: Request, res: Response) => {
 
 /**
  * GET /posts/:id
- * Get a single post by ID or slug.
+ * Get a single post by UUID or slug.
  */
 router.get("/:id", async (req: Request, res: Response) => {
   try {
     const identifier = req.params.id;
-
-    // Try UUID first, then slug
     const post = await prisma.post.findFirst({
-      where: {
-        OR: [
-          { id: identifier },
-          { slug: identifier },
-        ],
-      },
+      // PostgreSQL rejects a non-UUID value when it is compared to the UUID
+      // primary key, so only include the id branch for actual UUIDs.
+      where: UUID_PATTERN.test(identifier) ? { id: identifier } : { slug: identifier },
       select: {
         id: true,
         title: true,
@@ -87,7 +83,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 /**
  * POST /posts
- * Create a new blog post.
+ * Create a new post.
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -97,14 +93,10 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
-    const existing = await prisma.post.findUnique({ where: { slug: parsed.data.slug } });
-    if (existing) {
-      res.status(409).json({ error: `Post with slug '${parsed.data.slug}' already exists` });
-      return;
-    }
+    const { title, slug, content, tags } = parsed.data;
 
     const post = await prisma.post.create({
-      data: parsed.data,
+      data: { title, slug, content, tags },
       select: {
         id: true,
         title: true,
@@ -116,7 +108,11 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ data: post });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      res.status(409).json({ error: "A post with this slug already exists" });
+      return;
+    }
     console.error("Error creating post:", error);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -124,30 +120,22 @@ router.post("/", async (req: Request, res: Response) => {
 
 /**
  * GET /posts/:id/images
- * Get ranked image suggestions for a post.
- * Python writes suggestions to the DB; this endpoint reads them.
+ * Get image suggestions for a post.
  */
 router.get("/:id/images", async (req: Request, res: Response) => {
   try {
     const identifier = req.params.id;
-
-    // Resolve post by ID or slug
     const post = await prisma.post.findFirst({
-      where: {
-        OR: [
-          { id: identifier },
-          { slug: identifier },
-        ],
-      },
+      where: UUID_PATTERN.test(identifier) ? { id: identifier } : { slug: identifier },
     });
-
     if (!post) {
       res.status(404).json({ error: "Post not found" });
       return;
     }
 
     const suggestions = await prisma.suggestion.findMany({
-      where: { postId: post.id },
+      where: { postId: post.id, guardPassed: true },
+      orderBy: { rank: "asc" },
       include: {
         image: {
           select: {
@@ -160,52 +148,22 @@ router.get("/:id/images", async (req: Request, res: Response) => {
           },
         },
       },
-      orderBy: { rank: "asc" },
     });
 
-    // Separate passed and rejected
-    const passed = suggestions.filter((s) => s.guardPassed);
-    const rejected = suggestions.filter((s) => !s.guardPassed);
-
-    // If no suggestion passed the guard
-    if (passed.length === 0) {
-      const bestRejected = rejected[0];
-      res.json({
-        match: null,
-        reason: bestRejected
-          ? `No confident match. Best candidate rejected: ${bestRejected.guardReason}`
-          : "No image candidates found for this post.",
-        allCandidates: suggestions.map((s) => ({
-          id: s.id,
-          image: s.image,
-          similarityScore: s.similarityScore,
-          guardPassed: s.guardPassed,
-          guardReason: s.guardReason,
-          rank: s.rank,
-          status: s.status,
-        })),
-      });
-      return;
-    }
+    const data = suggestions.map((s) => ({
+      id: s.id,
+      image: s.image,
+      similarityScore: s.similarityScore,
+      guardPassed: s.guardPassed,
+      guardReason: s.guardReason,
+      rank: s.rank,
+      status: s.status,
+    }));
 
     res.json({
-      match: {
-        id: passed[0].id,
-        image: passed[0].image,
-        similarityScore: passed[0].similarityScore,
-        guardReason: passed[0].guardReason,
-        rank: passed[0].rank,
-        status: passed[0].status,
-      },
-      allCandidates: suggestions.map((s) => ({
-        id: s.id,
-        image: s.image,
-        similarityScore: s.similarityScore,
-        guardPassed: s.guardPassed,
-        guardReason: s.guardReason,
-        rank: s.rank,
-        status: s.status,
-      })),
+      data,
+      match: data[0] ?? null,
+      message: data.length === 0 ? "No confident match found" : undefined,
     });
   } catch (error) {
     console.error("Error fetching post images:", error);
