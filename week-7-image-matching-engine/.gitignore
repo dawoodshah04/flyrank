@@ -1,0 +1,30 @@
+
+# Environment
+.env
+.env.local
+
+# Node
+node_modules/
+dist/
+server/node_modules/
+server/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+ai/.venv/
+ai/venv/
+*.egg-info/
+/AI Image Understanding Live Capstone.pdf
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-data/

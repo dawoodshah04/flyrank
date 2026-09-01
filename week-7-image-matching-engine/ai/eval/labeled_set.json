@@ -1,0 +1,34 @@
+[
+  {
+    "post_slug": "red-fox-behavior",
+    "correct_image_filename": "red_fox_01.jpg"
+  },
+  {
+    "post_slug": "gray-wolf-pack-dynamics",
+    "correct_image_filename": "gray_wolf_01.jpg"
+  },
+  {
+    "post_slug": "best-dog-breeds-families",
+    "correct_image_filename": "dog_01.jpg"
+  },
+  {
+    "post_slug": "mountain-hiking-adventures",
+    "correct_image_filename": "mountain_01.jpg"
+  },
+  {
+    "post_slug": "ocean-conservation-efforts",
+    "correct_image_filename": "ocean_01.jpg"
+  },
+  {
+    "post_slug": "backyard-garden-design",
+    "correct_image_filename": "garden_01.jpg"
+  },
+  {
+    "post_slug": "bear-watching-national-parks",
+    "correct_image_filename": "bear_01.jpg"
+  },
+  {
+    "post_slug": "birdwatching-beginners",
+    "correct_image_filename": "bird_01.jpg"
+  }
+]

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "API server for AI Image Matching Engine",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
