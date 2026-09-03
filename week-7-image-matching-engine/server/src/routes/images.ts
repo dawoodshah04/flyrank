@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
-import prisma from "../db";
-import { ImageQuerySchema } from "../schemas/image";
+import prisma from "../db.js";
+import { ImageQuerySchema } from "../schemas/image.js";
 
 const router = Router();
 

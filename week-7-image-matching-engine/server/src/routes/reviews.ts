@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
-import prisma from "../db";
-import { SuggestionQuerySchema, ReviewActionSchema } from "../schemas/suggestion";
+import prisma from "../db.js";
+import { SuggestionQuerySchema, ReviewActionSchema } from "../schemas/suggestion.js";
 
 const router = Router();
 
@@ -21,7 +21,14 @@ router.get("/", async (req: Request, res: Response) => {
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
-    if (postId) where.postId = postId;
+    if (postId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId)) {
+        const post = await prisma.post.findUnique({ where: { slug: postId } });
+        where.postId = post?.id ?? postId;
+      } else {
+        where.postId = postId;
+      }
+    }
 
     const [suggestions, total] = await Promise.all([
       prisma.suggestion.findMany({
@@ -93,7 +100,7 @@ router.get("/:id", async (req: Request, res: Response) => {
  */
 router.post("/:id/approve", async (req: Request, res: Response) => {
   try {
-    const parsed = ReviewActionSchema.safeParse(req.body);
+    const parsed = ReviewActionSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
       return;
@@ -130,7 +137,7 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
  */
 router.post("/:id/reject", async (req: Request, res: Response) => {
   try {
-    const parsed = ReviewActionSchema.safeParse(req.body);
+    const parsed = ReviewActionSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
       return;

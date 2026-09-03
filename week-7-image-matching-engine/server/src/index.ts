@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
-import { config } from "./config";
-import imageRoutes from "./routes/images";
-import postRoutes from "./routes/posts";
-import reviewRoutes from "./routes/reviews";
+import { config } from "./config.js";
+import imageRoutes from "./routes/images.js";
+import postRoutes from "./routes/posts.js";
+import reviewRoutes from "./routes/reviews.js";
 
 const app = express();
 
